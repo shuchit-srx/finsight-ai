@@ -16,28 +16,23 @@ connectDB();
 
 const app = express();
 
-// Security headers
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
   })
 );
 
-// Request logging
 app.use(morgan("dev"));
 
-// CORS
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_URL,
     credentials: true,
   })
 );
 
-// Parse JSON body
 app.use(express.json());
 
-// Rate limiter (prevents spam)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
   max: 200,                 // limit each IP
