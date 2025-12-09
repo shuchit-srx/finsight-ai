@@ -1,41 +1,31 @@
 import mongoose from "mongoose";
 
-const transactionSchema = new mongoose.Schema(
+const TransactionSchema = new mongoose.Schema(
     {
-        user: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-            index: true,
-        },
-        date: {
-            type: Date,
-            required: true,
-        },
-        description: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        amount: {
-            type: Number,
-            required: true,
-            min: 0,
-        },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        date: { type: Date, required: true },
+        description: { type: String, required: true },
+        amount: { type: Number, required: true },
         category: {
-            type: String,
-            enum: [
+            type: String, enum: [
                 "food",
                 "rent",
                 "transport",
                 "shopping",
                 "subscriptions",
                 "others",
-            ],
-            default: "others",
-        },
+            ], default: "others"
+        }
     },
     { timestamps: true }
 );
 
-export const Transaction = mongoose.model("Transaction", transactionSchema);
+// used for duplicate detection
+TransactionSchema.statics.findDuplicate = function (user, date, description, amount) {
+    return this.findOne({ user, date, description, amount });
+};
+
+export const Transaction = mongoose.model("Transaction", TransactionSchema);
+
+
+

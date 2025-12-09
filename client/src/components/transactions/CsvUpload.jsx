@@ -1,101 +1,103 @@
 // src/components/transactions/CsvUpload.jsx
 import { useState } from "react";
-import api from "../../lib/api";
-import Card from "../common/Card.jsx";
+import { useTransactions } from "../../context/TransactionContext";
 
 export default function CsvUpload() {
-    const [file, setFile] = useState(null);
-    const [uploading, setUploading] = useState(false);
-    const [message, setMessage] = useState("");
+  const { uploadCSV } = useTransactions();
 
-    const handleUpload = async () => {
-        if (!file) {
-            setMessage("Please choose a CSV file first.");
-            return;
-        }
+  const [file, setFile] = useState(null);
+  const [duplicateMode, setDuplicateMode] = useState("skip"); // skip | allow
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState("");
 
-        setUploading(true);
-        setMessage("");
+  const handleUpload = async () => {
+    if (!file) {
+      setResult("Please select a CSV file first.");
+      return;
+    }
 
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
+    setLoading(true);
+    setResult("");
 
-            const res = await api.post("/transactions/upload", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
+    try {
+      const res = await uploadCSV(file, duplicateMode);
+      setResult(`Uploaded: ${res.insertedCount} transactions`);
+    } catch (err) {
+      console.error(err);
+      setResult("Upload failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            setMessage(`Uploaded ${res.data.insertedCount} transactions.`);
-            setFile(null);
-        } catch (err) {
-            console.error(err);
-            setMessage("Upload failed. Check your file format.");
-        } finally {
-            setUploading(false);
-        }
-    };
+  return (
+    <div className="p-4 mt-4 rounded-xl border border-slate-800 bg-slate-900/70">
+      <p className="text-sm text-slate-300 mb-2">Upload CSV bank statement</p>
 
-    return (
-        <Card className="p-5">
-            <p className="text-xs uppercase text-slate-400 mb-2">
-                Upload CSV Statement
-            </p>
+      {/* File picker */}
+      <div className="flex items-center gap-3 mb-4">
+        <label
+          className="
+            px-4 py-2 rounded-lg cursor-pointer bg-slate-800 
+            border border-slate-700 text-slate-200 text-sm hover:bg-slate-700
+          "
+        >
+          Choose File
+          <input
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files[0])}
+          />
+        </label>
 
-            <p className="text-xs text-slate-500 mb-4">
-                CSV must contain <span className="text-slate-300">date, description, amount</span> columns.
-            </p>
+        <span className="text-xs text-slate-400">
+          {file ? file.name : "No file selected"}
+        </span>
+      </div>
 
-            <div className="flex items-center gap-4 flex-wrap">
+      {/* Duplicate mode */}
+      <div className="mb-3 text-xs text-slate-400">
+        <label className="mr-3">
+          <input
+            type="radio"
+            value="skip"
+            checked={duplicateMode === "skip"}
+            onChange={() => setDuplicateMode("skip")}
+            className="mr-1"
+          />
+          Skip duplicate transactions
+        </label>
 
-                {/* Choose File Button */}
-                <label
-                    className="
-                        cursor-pointer inline-flex items-center gap-2
-                        px-4 py-2.5 rounded-lg text-sm font-medium
-                        bg-slate-900 border border-slate-700
-                        hover:bg-slate-800 hover:border-slate-600
-                        text-slate-200 transition
-                    "
-                >
-                    📁 Choose CSV File
-                    <input
-                        type="file"
-                        accept=".csv"
-                        name="file"
-                        className="hidden"
-                        onChange={(e) => setFile(e.target.files[0])}
-                    />
-                </label>
+        <label>
+          <input
+            type="radio"
+            value="allow"
+            checked={duplicateMode === "allow"}
+            onChange={() => setDuplicateMode("allow")}
+            className="mr-1"
+          />
+          Allow duplicates
+        </label>
+      </div>
 
-                {/* Upload Button */}
-                <button
-                    onClick={handleUpload}
-                    disabled={uploading}
-                    className="
-                        px-4 py-2.5 rounded-lg text-sm font-medium
-                        bg-emerald-500 text-slate-950
-                        hover:bg-emerald-400
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                        transition shadow-[0_0_15px_rgba(16,185,129,0.4)]
-                    "
-                >
-                    {uploading ? "Uploading..." : "Upload"}
-                </button>
-            </div>
+      {/* Upload button */}
+      <button
+        onClick={handleUpload}
+        disabled={loading}
+        className="
+          px-4 py-2 rounded-lg text-sm font-medium 
+          bg-emerald-500 text-slate-950
+          hover:bg-emerald-400 transition
+          disabled:opacity-50 disabled:cursor-not-allowed
+        "
+      >
+        {loading ? "Uploading..." : "Upload CSV"}
+      </button>
 
-            {/* Filename Preview */}
-            {file && (
-                <p className="text-xs text-slate-400 mt-2">
-                    Selected file: <span className="text-slate-200">{file.name}</span>
-                </p>
-            )}
-
-            {/* Message */}
-            {message && (
-                <p className="text-xs text-emerald-300 mt-3">
-                    {message}
-                </p>
-            )}
-        </Card>
-    );
+      {result && (
+        <p className="mt-3 text-xs text-slate-300">{result}</p>
+      )}
+    </div>
+  );
 }

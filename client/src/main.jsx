@@ -4,13 +4,14 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./index.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { TransactionsProvider } from "./context/TransactionContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
+  <BrowserRouter>
     <AuthProvider>
-      <BrowserRouter>
+      <TransactionsProvider>
         <App />
-      </BrowserRouter>
+      </TransactionsProvider>
     </AuthProvider>
-  </React.StrictMode>
+  </BrowserRouter>
 );

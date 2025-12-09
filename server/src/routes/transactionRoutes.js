@@ -4,11 +4,11 @@ import csv from "csv-parser";
 import { Readable } from "stream";
 import { auth } from "../middleware/auth.js";
 import { Transaction } from "../models/Transaction.js";
+import { checkDuplicate } from "../utils/checkDuplicate.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Category guesser
 const guessCategory = (description = "") => {
     const desc = description.toLowerCase();
     if (/uber|ola|bus|train|cab|metro|fuel/.test(desc)) return "transport";
@@ -19,12 +19,28 @@ const guessCategory = (description = "") => {
     return "others";
 };
 
-// Add single transaction
+// SINGLE TRANSACTION
 router.post("/", auth, async (req, res) => {
     try {
-        const { date, description, amount, category } = req.body;
+        const { date, description, amount, category, forceRepeat } = req.body;
+
         if (!date || !description || amount == null) {
             return res.status(400).json({ message: "Missing fields" });
+        }
+
+        const duplicate = await checkDuplicate(
+            Transaction,
+            req.user._id,
+            new Date(date),
+            description,
+            Number(amount)
+        );
+
+        if (duplicate && !forceRepeat) {
+            return res.status(409).json({
+                message: "Duplicate transaction detected",
+                duplicate
+            });
         }
 
         const txn = await Transaction.create({
@@ -42,34 +58,12 @@ router.post("/", auth, async (req, res) => {
     }
 });
 
-// Fetch transactions
-router.get("/", auth, async (req, res) => {
-    try {
-        const { startDate, endDate, category } = req.query;
-
-        const query = { user: req.user._id };
-
-        if (startDate || endDate) {
-            query.date = {};
-            if (startDate) query.date.$gte = new Date(startDate);
-            if (endDate) query.date.$lte = new Date(endDate);
-        }
-
-        if (category && category !== "all") query.category = category;
-
-        const transactions = await Transaction.find(query).sort({ date: -1 });
-        res.json(transactions);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Server error" });
-    }
-});
-
-// CSV UPLOAD 
+// CSV UPLOAD
 router.post("/upload", auth, upload.single("file"), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    const skip = req.query.skip === "true";
+    const force = req.query.force === "true";
 
     try {
         const csvData = [];
@@ -77,36 +71,58 @@ router.post("/upload", auth, upload.single("file"), async (req, res) => {
 
         stream
             .pipe(csv())
-            .on("data", (row) => {
-                csvData.push(row);
-            })
+            .on("data", (row) => csvData.push(row))
             .on("end", async () => {
-                try {
-                    const docs = csvData.map((r) => ({
-                        user: req.user._id,
-                        date: new Date(r.date),
-                        description: r.description,
-                        amount: parseFloat(r.amount),
-                        category: guessCategory(r.description),
-                    }));
+                const duplicates = [];
+                const valid = [];
 
-                    const inserted = await Transaction.insertMany(docs);
-                    return res.json({
-                        insertedCount: inserted.length,
-                        message: "CSV uploaded successfully",
-                    });
-                } catch (err) {
-                    console.error("Insert error:", err);
-                    return res.status(500).json({ message: "DB insert error" });
+                for (const r of csvData) {
+                    const date = new Date(r.date);
+                    const description = r.description;
+                    const amount = parseFloat(r.amount);
+
+                    const duplicate = await checkDuplicate(
+                        Transaction,
+                        req.user._id,
+                        date,
+                        description,
+                        amount
+                    );
+
+                    if (duplicate && !force && !skip) {
+                        duplicates.push(r);
+                    } else {
+                        valid.push({
+                            user: req.user._id,
+                            date,
+                            description,
+                            amount,
+                            category: guessCategory(description),
+                        });
+                    }
                 }
+
+                if (duplicates.length && !force && !skip) {
+                    return res.status(409).json({
+                        message: "Duplicates detected",
+                        duplicates,
+                    });
+                }
+
+                const inserted = await Transaction.insertMany(valid);
+
+                return res.json({
+                    insertedCount: inserted.length,
+                    duplicatesSkipped: duplicates.length,
+                });
             })
             .on("error", (err) => {
-                console.error("CSV parse error:", err);
-                return res.status(500).json({ message: "CSV parse error" });
+                console.error(err);
+                res.status(500).json({ message: "CSV parse error" });
             });
     } catch (err) {
-        console.error("Upload handler error:", err);
-        return res.status(500).json({ message: "Upload failed" });
+        console.error(err);
+        res.status(500).json({ message: "Upload failed" });
     }
 });
 
