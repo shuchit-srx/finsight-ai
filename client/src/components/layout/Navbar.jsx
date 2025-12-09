@@ -1,34 +1,167 @@
-import { useAuth } from "../../context/AuthContext";
+import { useState, useMemo } from "react";
+import { NavLink } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext.jsx";
+
+const links = [
+    { label: "Dashboard", to: "/" },
+    { label: "Transactions", to: "/transactions" },
+    { label: "History", to: "/history" },
+    { label: "Settings", to: "/settings" },
+];
 
 export default function Navbar() {
     const { user, logout } = useAuth();
+    const [open, setOpen] = useState(false);
+
+    const initials = useMemo(() => {
+        if (!user?.name) return "";
+        return user.name
+            .split(" ")
+            .map((p) => p[0]?.toUpperCase())
+            .slice(0, 2)
+            .join("");
+    }, [user]);
+
+    const toggle = () => setOpen((v) => !v);
+    const close = () => setOpen(false);
 
     return (
-        <header className="fixed top-0 inset-x-0 z-40 border-b border-slate-800 bg-slate-950/70 backdrop-blur-xl">
-            <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 flex items-center justify-center text-xs font-bold">
-                        ₹
+        <header className="fixed top-0 inset-x-0 z-40">
+            {/* Main bar */}
+            <div className="border-b border-slate-800/90 bg-linear-to-r from-slate-950/95 via-slate-950/90 to-slate-900/95 backdrop-blur-xl shadow-[0_10px_40px_rgba(15,23,42,0.9)]">
+                <div className="mx-auto px-6 py-3 flex items-center justify-between gap-3 md:px-10">
+                    {/* Brand */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-2xl bg-linear-to-br from-indigo-500 via-emerald-400 to-cyan-400 flex items-center justify-center text-xs font-bold text-slate-950 shadow-[0_0_25px_rgba(34,197,94,0.8)]">
+                            ₹
+                        </div>
+                        <div className="flex flex-col leading-tight">
+                            <span className="text-sm font-semibold tracking-tight">
+                                FinSight<span className="text-emerald-400">AI</span>
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                                AI-powered financial advisor
+                            </span>
+                        </div>
                     </div>
-                    <span className="text-lg font-semibold tracking-tight">
-                        FinSight<span className="text-emerald-400">AI</span>
-                    </span>
-                </div>
 
-                {user && (
-                    <div className="flex items-center gap-3 text-sm">
-                        <span className="text-slate-300 hidden sm:inline">
-                            {user.name}
-                        </span>
-                        <button
-                            onClick={logout}
-                            className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 transition text-xs"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                )}
+                    {/* Desktop right side */}
+                    {user && (
+                        <div className="hidden md:flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[11px] font-semibold text-slate-100">
+                                    {initials || "U"}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-medium text-slate-100">
+                                        {user.name}
+                                    </span>
+                                    <span className="text-[11px] text-slate-400">
+                                        Signed in · {new Date().toLocaleDateString("en-IN", {
+                                            day: "2-digit",
+                                            month: "short",
+                                        })}
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={logout}
+                                className="px-3 py-1.5 rounded-lg 
+    border border-red-600/40 
+    bg-red-600/10
+    text-xs font-medium text-red-300 
+    backdrop-blur-sm
+    transition-all duration-200
+    hover:bg-red-600/20 
+    hover:border-red-500/60 
+    hover:text-red-200
+    active:bg-red-600/30
+    cursor-pointer
+  "
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Mobile controls */}
+                    {user && (
+                        <div className="flex items-center gap-2 md:hidden">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[11px] font-semibold text-slate-100">
+                                    {initials || "U"}
+                                </div>
+
+                            </div>
+                            <button
+                                onClick={logout}
+                                className="px-3 py-1.5 rounded-lg 
+    border border-red-600/40 
+    bg-red-600/10
+    text-xs font-medium text-red-300 
+    backdrop-blur-sm
+    transition-all duration-200
+    hover:bg-red-600/20 
+    hover:border-red-500/60 
+    hover:text-red-200
+    active:bg-red-600/30
+    cursor-pointer"
+                            >
+                                Logout
+                            </button>
+                            <button
+                                onClick={toggle}
+                                className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 transition"
+                            >
+                                <span className="sr-only">Toggle navigation</span>
+                                <div className="space-y-1.5">
+                                    <span className="block h-0.5 w-5 bg-slate-200 rounded-full" />
+                                    <span className="block h-0.5 w-5 bg-slate-200 rounded-full" />
+                                    <span className="block h-0.5 w-5 bg-slate-200 rounded-full" />
+                                </div>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
-        </header>
+
+            {/* Mobile dropdown menu */}
+            {
+                user && open && (
+                    <nav className="md:hidden border-b border-slate-800/90 bg-slate-950/98 backdrop-blur-xl">
+                        <ul className="max-w-6xl mx-auto px-2 py-2 space-y-1">
+                            {links.map((item) => (
+                                <li key={item.to}>
+                                    <NavLink
+                                        to={item.to}
+                                        onClick={close}
+                                        className={({ isActive }) =>
+                                            [
+                                                "flex items-center gap-2 px-3 py-2 rounded-lg text-sm",
+                                                isActive
+                                                    ? "bg-slate-800 text-slate-50"
+                                                    : "text-slate-300 hover:bg-slate-900 hover:text-slate-50",
+                                            ].join(" ")
+                                        }
+                                    >
+                                        <span className="text-base">
+                                            {
+                                                {
+                                                    "/": "📊",
+                                                    "/transactions": "📄",
+                                                    "/history": "🕒",
+                                                    "/settings": "⚙️",
+                                                }[item.to]
+                                            }
+                                        </span>
+                                        <span>{item.label}</span>
+                                    </NavLink>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                )
+            }
+        </header >
     );
 }

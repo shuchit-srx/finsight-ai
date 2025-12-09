@@ -5,21 +5,27 @@ import { Transaction } from "../models/Transaction.js";
 
 const router = express.Router();
 
-// Set or update budget for month
 router.post("/", auth, async (req, res) => {
     try {
         const { month, year, total, perCategory } = req.body;
-        if (!month || !year || !total)
-            return res.status(400).json({ message: "month, year, total required" });
+        if (!month || !year) {
+            return res
+                .status(400)
+                .json({ message: "month and year required" });
+        }
 
         const budget = await Budget.findOneAndUpdate(
             { user: req.user._id, month, year },
-            { total, perCategory: perCategory || {} },
+            {
+                total: total ?? null,
+                perCategory: perCategory || {},
+            },
             { upsert: true, new: true }
         );
 
         res.json(budget);
-    } catch {
+    } catch (err) {
+        console.error("POST /api/budgets error:", err.message);
         res.status(500).json({ message: "Server error" });
     }
 });
@@ -27,9 +33,16 @@ router.post("/", auth, async (req, res) => {
 // Get budget + current spending + status flags
 router.get("/", auth, async (req, res) => {
     try {
-        const { month, year } = req.query;
-        if (!month || !year)
-            return res.status(400).json({ message: "month & year required" });
+        let { month, year } = req.query;
+
+        if (!month || !year) {
+            const now = new Date();
+            month = now.getMonth() + 1;
+            year = now.getFullYear();
+        }
+
+        month = Number(month);
+        year = Number(year);
 
         const budget = await Budget.findOne({
             user: req.user._id,
@@ -45,13 +58,17 @@ router.get("/", auth, async (req, res) => {
             date: { $gte: start, $lte: end },
         });
 
-        const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
+        const totalSpent = transactions.reduce(
+            (sum, t) => sum + t.amount,
+            0
+        );
+
         const byCategory = {};
         for (const t of transactions) {
-            byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+            const cat = t.category || "others";
+            byCategory[cat] = (byCategory[cat] || 0) + t.amount;
         }
 
-        // status helpers
         const statusFor = (spent, budgetValue) => {
             if (!budgetValue) return "no-budget";
             const ratio = spent / budgetValue;
@@ -63,11 +80,15 @@ router.get("/", auth, async (req, res) => {
         const totalStatus = budget
             ? statusFor(totalSpent, budget.total)
             : "no-budget";
+
         const perCategoryStatus = {};
 
         if (budget && budget.perCategory) {
             for (const [cat, value] of budget.perCategory.entries()) {
-                perCategoryStatus[cat] = statusFor(byCategory[cat] || 0, value);
+                perCategoryStatus[cat] = statusFor(
+                    byCategory[cat] || 0,
+                    value
+                );
             }
         }
 
@@ -79,7 +100,7 @@ router.get("/", auth, async (req, res) => {
             perCategoryStatus,
         });
     } catch (err) {
-        console.error(err);
+        console.error("GET /api/budgets error:", err.message);
         res.status(500).json({ message: "Server error" });
     }
 });

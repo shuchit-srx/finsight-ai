@@ -19,7 +19,7 @@ export default function App() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-slate-50">
+    <div className="min-h-screen bg-linear-to-b from-slate-950 via-slate-950 to-slate-900 text-slate-50">
       {user ? (
         <AppLayout>
           <Routes>

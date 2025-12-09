@@ -63,7 +63,7 @@ export default function TransactionForm({ onAdded }) {
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                 </div>
-                <div className="flex-[2]">
+                <div className="flex-2">
                     <label className="block text-xs text-slate-400 mb-1">
                         Description
                     </label>

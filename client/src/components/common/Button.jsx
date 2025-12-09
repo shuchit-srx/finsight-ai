@@ -13,7 +13,7 @@ export default function Button({
         ghost: "text-slate-300 hover:bg-slate-800/60",
     };
     return (
-        <button className={`${base} ${variants[variant]} ${className}`} {...props}>
+        <button className={`cursor-pointer ${base} ${variants[variant]} ${className}`} {...props}>
             {children}
         </button>
     );

@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import SummaryCards from "../components/dashboard/SummaryCards.jsx";
 import SpendingCharts from "../components/dashboard/SpendingCharts.jsx";
-import AlertsBlock from "../components/dashboard/AlertsBlock.jsx";
 import Loader from "../components/common/Loader.jsx";
+import Card from "../components/common/Card.jsx";
 
 const getMonthYear = () => {
     const now = new Date();
@@ -27,22 +27,26 @@ export default function DashboardPage() {
                     api.post("/summaries/monthly", { month, year }),
                     api.get("/transactions", {
                         params: {
-                            startDate: new Date(year, month - 1, 1).toISOString().slice(0, 10),
+                            startDate: new Date(year, month - 1, 1)
+                                .toISOString()
+                                .slice(0, 10),
                             endDate: new Date(year, month, 0).toISOString().slice(0, 10),
                         },
                     }),
                 ]);
 
-                setBudgetData(budgetRes.data);
-                setSummary(summaryRes.data);
+                setBudgetData(budgetRes.data || null);
+                setSummary(summaryRes.data || null);
 
-                const tx = txRes.data;
+                const tx = txRes.data || [];
                 const byDate = {};
                 const cat = {};
+
                 tx.forEach((t) => {
                     const d = new Date(t.date).toISOString().slice(0, 10);
                     byDate[d] = (byDate[d] || 0) + t.amount;
-                    cat[t.category] = (cat[t.category] || 0) + t.amount;
+                    const key = t.category || "others";
+                    cat[key] = (cat[key] || 0) + t.amount;
                 });
 
                 const dates = Object.keys(byDate).sort();
@@ -54,7 +58,7 @@ export default function DashboardPage() {
                 );
                 setByCategory(cat);
             } catch (err) {
-                console.error(err);
+                console.error("Error loading dashboard data:", err);
             } finally {
                 setLoading(false);
             }
@@ -65,14 +69,31 @@ export default function DashboardPage() {
 
     if (loading) return <Loader />;
 
-    const { totalSpent = 0, totalStatus, perCategoryStatus } = budgetData || {};
+    let totalSpent = 0;
+    let totalStatus;
+    let perCategoryStatus = {};
+
+    if (budgetData) {
+        if (typeof budgetData.totalSpent === "number") {
+            totalSpent = budgetData.totalSpent;
+        }
+        if (budgetData.totalStatus) {
+            totalStatus = budgetData.totalStatus;
+        }
+        if (budgetData.perCategoryStatus) {
+            perCategoryStatus = budgetData.perCategoryStatus;
+        }
+    }
+
     const monthLabel = `${new Date(year, month - 1).toLocaleString("default", {
         month: "short",
     })} ${year}`;
 
+    const topCategories = summary?.topCategories || [];
+
     return (
-        <div className="max-w-6xl mx-auto mt-6">
-            <header className="mb-4">
+        <div className="max-w-6xl mx-auto mt-6 space-y-6">
+            <header>
                 <h1 className="text-2xl font-semibold tracking-tight">
                     Your overview
                 </h1>
@@ -81,35 +102,110 @@ export default function DashboardPage() {
                 </p>
             </header>
 
+            {/* Summary cards */}
             <SummaryCards
                 totalSpent={totalSpent}
                 totalStatus={totalStatus}
                 savingGoal={summary?.savingGoal || 0}
                 monthLabel={monthLabel}
+                perCategoryStatus={perCategoryStatus}
             />
 
+            {/* Charts */}
             <SpendingCharts byCategory={byCategory} timeline={timeline} />
 
-            <section className="mt-4">
-                <p className="text-sm font-medium mb-1">Latest AI advice</p>
-                <div className="text-sm text-slate-200 space-y-1">
-                    <p>{summary?.summaryText}</p>
-                    <p>
-                        <span className="font-semibold">Suggestions:</span>{" "}
-                        {summary?.cutSuggestions}
-                    </p>
-                    {summary?.topCategories?.length ? (
-                        <p className="text-xs text-slate-400">
-                            Top categories: {summary.topCategories.join(", ")}
-                        </p>
-                    ) : null}
-                </div>
+            {/* Reader-friendly AI advice block */}
+            <section>
+                <Card className="p-5 mt-2">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        {/* Summary text */}
+                        <div className="flex-1">
+                            <p className="text-xs uppercase text-slate-400 mb-1">
+                                Latest AI advice
+                            </p>
+                            <p className="text-sm text-slate-200 leading-relaxed">
+                                {summary?.summaryText ||
+                                    "Once you add some transactions, your AI spending summary will appear here."}
+                            </p>
+                        </div>
+
+                        {/* Suggestions & focus areas */}
+                        <div className="flex-1 mt-3 md:mt-0 md:pl-6 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0">
+                            <p className="text-xs uppercase text-slate-400 mb-1">
+                                Suggested focus areas
+                            </p>
+                            <p className="text-sm text-slate-200 leading-relaxed mb-2">
+                                {summary?.cutSuggestions ||
+                                    "Try to keep discretionary categories like food, shopping and transport under control and review recurring subscriptions regularly."}
+                            </p>
+
+                            {topCategories.length > 0 && (
+                                <div className="mt-2">
+                                    <p className="text-xs text-slate-400 mb-2.5">
+                                        Categories to watch
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {topCategories.map((cat) => (
+                                            <span
+                                                key={cat}
+                                                className="px-2 py-1 rounded-full bg-slate-900 border border-slate-700 text-[11px] text-slate-200"
+                                            >
+                                                {cat}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </Card>
             </section>
 
-            <AlertsBlock
-                totalStatus={totalStatus}
-                perCategoryStatus={perCategoryStatus || {}}
-            />
+            {/* Quick tips section */}
+            <section>
+                <Card className="p-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:gap-8">
+                        <div className="flex-1">
+                            <p className="text-xs uppercase text-slate-400 mb-1">
+                                Quick tips
+                            </p>
+                            <p className="text-sm text-slate-300 mb-3">
+                                Small changes add up. Use these to keep your monthly spending
+                                predictable and less chaotic.
+                            </p>
+                            <ul className="space-y-1.5 text-xs text-slate-300">
+                                <li>• Fix a weekly limit for food & ordering in.</li>
+                                <li>
+                                    • Check subscriptions once a month and cancel what you
+                                    don&apos;t use.
+                                </li>
+                                <li>
+                                    • Move savings to a separate account at the start of the
+                                    month.
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div className="flex-1 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6">
+                            <p className="text-xs uppercase text-slate-400 mb-1">
+                                Practical habits
+                            </p>
+                            <ul className="space-y-1.5 text-xs text-slate-300">
+                                <li>
+                                    • Before big purchases, wait 24 hours and decide again.
+                                </li>
+                                <li>
+                                    • Group transport tasks (shopping, errands) to cut
+                                    fuel/rides.
+                                </li>
+                                <li>
+                                    • Review this dashboard once a week instead of ignoring it.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </Card>
+            </section>
         </div>
     );
 }

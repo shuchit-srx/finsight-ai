@@ -2,17 +2,61 @@ import express from "express";
 import { auth } from "../middleware/auth.js";
 import { Transaction } from "../models/Transaction.js";
 import { MonthlySummary } from "../models/MonthlySummary.js";
-import { getSpendingAnalysis } from "../utils/aiClient.js";
+// Optional: import { getGeminiModel } from "../utils/aiClient.js";
 
 const router = express.Router();
 
-// Generate or refresh AI summary for a given month
+const buildFallbackSummary = (transactions, month, year) => {
+    const total = transactions.reduce((sum, t) => sum + t.amount, 0);
+
+    const byCategory = {};
+    for (const t of transactions) {
+        const cat = t.category || "others";
+        byCategory[cat] = (byCategory[cat] || 0) + t.amount;
+    }
+
+    const sortedCats = Object.entries(byCategory).sort(
+        (a, b) => b[1] - a[1]
+    );
+    const topCategories = sortedCats.slice(0, 3).map(([cat]) => cat);
+
+    const summaryText =
+        transactions.length === 0
+            ? `No transactions recorded yet for ${month}/${year}.`
+            : `For ${month}/${year}, your total recorded spending is ₹${total.toFixed(
+                2
+            )}. Your top spending categories are ${topCategories.join(
+                ", "
+            )}. Keeping these under control will have the biggest impact.`;
+
+    const cutSuggestions =
+        sortedCats.length === 0
+            ? "Once you add more transactions, we’ll highlight categories where you can reduce or optimize spending."
+            : `Start by trimming non-essential expenses in ${topCategories[0] || "your largest category"
+            }. Set simple weekly caps for food, shopping and transport to avoid end-of-month spikes.`;
+
+    const savingGoal = total > 0 ? Math.round(total * 0.15) : 0;
+
+    return {
+        summaryText,
+        cutSuggestions,
+        topCategories,
+        savingGoal,
+    };
+};
+
 router.post("/monthly", auth, async (req, res) => {
     try {
-        const { month, year } = req.body;
+        let { month, year } = req.body;
+
         if (!month || !year) {
-            return res.status(400).json({ message: "month & year required" });
+            const now = new Date();
+            month = now.getMonth() + 1;
+            year = now.getFullYear();
         }
+
+        month = Number(month);
+        year = Number(year);
 
         const start = new Date(year, month - 1, 1);
         const end = new Date(year, month, 0, 23, 59, 59);
@@ -20,58 +64,24 @@ router.post("/monthly", auth, async (req, res) => {
         const transactions = await Transaction.find({
             user: req.user._id,
             date: { $gte: start, $lte: end },
+        }).sort({ date: -1 });
+
+        const base = buildFallbackSummary(transactions, month, year);
+
+        const summaryDoc = await MonthlySummary.findOneAndUpdate(
+            { user: req.user._id, month, year },
+            base,
+            { upsert: true, new: true }
+        );
+
+        res.json({
+            summaryText: summaryDoc.summaryText,
+            cutSuggestions: summaryDoc.cutSuggestions,
+            topCategories: summaryDoc.topCategories,
+            savingGoal: summaryDoc.savingGoal,
         });
-
-        if (!transactions.length) {
-            return res
-                .status(400)
-                .json({ message: "No transactions for this period" });
-        }
-
-        // Ask Gemini for analysis
-        const aiAnalysis = await getSpendingAnalysis(transactions);
-
-        let summary = await MonthlySummary.findOne({
-            user: req.user._id,
-            month,
-            year,
-        });
-
-        if (summary) {
-            summary.summaryText = aiAnalysis.summaryText;
-            summary.topCategories = aiAnalysis.topCategories || [];
-            summary.cutSuggestions = aiAnalysis.cutSuggestions || "";
-            summary.savingGoal = aiAnalysis.savingGoal || 0;
-            await summary.save();
-        } else {
-            summary = await MonthlySummary.create({
-                user: req.user._id,
-                month,
-                year,
-                summaryText: aiAnalysis.summaryText,
-                topCategories: aiAnalysis.topCategories || [],
-                cutSuggestions: aiAnalysis.cutSuggestions || "",
-                savingGoal: aiAnalysis.savingGoal || 0,
-            });
-        }
-
-        res.json(summary);
     } catch (err) {
-        console.error("Error in /summaries/monthly:", err.message);
-        res.status(500).json({ message: "AI analysis failed" });
-    }
-});
-
-// History of all stored monthly summaries for the user
-router.get("/history", auth, async (req, res) => {
-    try {
-        const summaries = await MonthlySummary.find({
-            user: req.user._id,
-        }).sort({ year: -1, month: -1 });
-
-        res.json(summaries);
-    } catch (err) {
-        console.error("Error in /summaries/history:", err.message);
+        console.error("POST /api/summaries/monthly error:", err.message);
         res.status(500).json({ message: "Server error" });
     }
 });
