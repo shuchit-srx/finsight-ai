@@ -2,13 +2,13 @@ import Card from "../common/Card";
 import Button from "../common/Button";
 
 const categories = [
-    "all",
-    "food",
-    "rent",
-    "transport",
-    "shopping",
-    "subscriptions",
-    "others",
+    "All",
+    "Food",
+    "Rent",
+    "Transport",
+    "Shopping",
+    "Subscriptions",
+    "Others",
 ];
 
 export default function TransactionFilters({ filters, setFilters, onApply }) {

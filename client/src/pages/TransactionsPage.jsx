@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api.js";
 import CsvUpload from "../components/transactions/CsvUpload.jsx";
 import TransactionForm from "../components/transactions/TransactionForm.jsx";
-import TransactionFilters from "../components/transactions/TransactionFilters.jsx";
-import TransactionTable from "../components/transactions/TransactionTable.jsx";
+import TransactionBlock from "../components/transactions/TransactionBlock.jsx";
 
 export default function TransactionsPage() {
     const [transactions, setTransactions] = useState([]);
@@ -13,12 +12,14 @@ export default function TransactionsPage() {
         category: "all",
     });
 
-    const loadTransactions = async () => {
+    const loadTransactions = async (overrideFilters = filters) => {
         try {
-            const { data } = await api.get("/transactions", { params: filters });
+            const { data } = await api.get("/transactions", {
+                params: overrideFilters,
+            });
             setTransactions(data);
         } catch (err) {
-            console.error(err);
+            console.error("Failed to fetch transactions:", err);
         }
     };
 
@@ -26,22 +27,31 @@ export default function TransactionsPage() {
         loadTransactions();
     }, []);
 
+    const applyFilters = () => {
+        loadTransactions(filters);
+    };
+
     return (
-        <div className="max-w-6xl mx-auto mt-6">
-            <h1 className="text-2xl font-semibold tracking-tight mb-2">
-                Transactions
-            </h1>
-            <p className="text-sm text-slate-400 mb-2">
-                Upload a CSV or add entries manually, then filter by date or category.
-            </p>
+        <div className="max-w-6xl mx-auto mt-6 space-y-6">
+            <header>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                    Transactions
+                </h1>
+                <p className="text-sm text-slate-400">
+                    Upload CSV, add entries manually, and review everything in one place.
+                </p>
+            </header>
+
             <CsvUpload onUploaded={loadTransactions} />
+
             <TransactionForm onAdded={loadTransactions} />
-            <TransactionFilters
+
+            <TransactionBlock
                 filters={filters}
                 setFilters={setFilters}
-                onApply={loadTransactions}
+                onApply={applyFilters}
+                transactions={transactions}
             />
-            <TransactionTable transactions={transactions} />
         </div>
     );
 }

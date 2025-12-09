@@ -1,5 +1,3 @@
-import Card from "../common/Card";
-
 export default function TransactionTable({ transactions }) {
     return (
         <Card className="p-4 mt-4">
