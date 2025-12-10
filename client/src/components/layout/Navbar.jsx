@@ -142,16 +142,6 @@ export default function Navbar() {
                                             ].join(" ")
                                         }
                                     >
-                                        <span className="text-base">
-                                            {
-                                                {
-                                                    "/": "📊",
-                                                    "/transactions": "📄",
-                                                    "/history": "🕒",
-                                                    "/settings": "⚙️",
-                                                }[item.to]
-                                            }
-                                        </span>
                                         <span>{item.label}</span>
                                     </NavLink>
                                 </li>

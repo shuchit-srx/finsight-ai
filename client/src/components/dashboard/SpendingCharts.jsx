@@ -45,7 +45,7 @@ export default function SpendingCharts({ byCategory, timeline }) {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4">
 
             {/* Pie Chart for Categories */}
-            <Card className="p-4 md:col-span-2 h-78 ">
+            <Card className="p-4 md:col-span-2  h-76">
                 <p className="text-xs uppercase text-slate-400 mb-2 font-bold">
                     Spending by category
                 </p>
@@ -89,7 +89,7 @@ export default function SpendingCharts({ byCategory, timeline }) {
             </Card>
 
             {/* Timeline Chart */}
-            <Card className="p-4 md:col-span-3 max-h-78">
+            <Card className="p-4 md:col-span-3 h-76">
                 <p className="text-xs uppercase text-slate-400 mb-2 font-bold">
                     Activity over time
                 </p>
